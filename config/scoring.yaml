@@ -1,0 +1,47 @@
+# ═══════════════════════════════════════════════════════════════
+#  scoring.yaml — knobs for program_selector_agent (core.scoring).
+#
+#  Every criterion is reduced to a 0..1 score; the final program score
+#  is the WEIGHTED MEAN of these, scaled to 0..100. Weights need not sum
+#  to 1 — they are normalised by their own sum at runtime — but keeping
+#  them ~1.0 makes them easy to reason about.
+#
+#  All values here are user preferences. Edit freely; nothing here
+#  touches the network or the hard safety rules.
+# ═══════════════════════════════════════════════════════════════
+
+weights:
+  # Active bounty + median historical bounty_amount for the program.
+  bounty: 0.25
+  # Median days between submitted_at and triaged_at (faster → higher).
+  triage_speed: 0.15
+  # Number of in-scope assets + variety of asset types.
+  scope: 0.15
+  # Subjective competition/saturation (see competencia_programas), inverted.
+  competition: 0.10
+  # Overlap between the program's asset skills and your skill_set below.
+  skill_fit: 0.15
+  # Days since your last session on the program (un-worked surface = opportunity).
+  freshness: 0.10
+  # Personal saturation: days since your last OPEN finding there vs the threshold.
+  saturation: 0.10
+
+# Your declared skill set. Used by skill_fit. Tags are matched against the
+# asset types of each program (web / api / cloud / mobile / network / code /
+# blockchain). Edit to match where you are strong today.
+skill_set:
+  - web
+  - api
+  - cloud
+
+# Personal-saturation threshold, in days. If you opened a finding on a program
+# more recently than this, it is considered "saturated" (lower score) — you
+# already have open work there. Beyond the threshold, saturation clears.
+saturacion_umbral_dias: 14
+
+# Subjective competition per program handle, 0..1 (1 = extremely crowded /
+# picked-over, therefore LESS attractive; 0 = quiet). Anything not listed
+# defaults to 0.5 (neutral). Tune these by hand from your own read of each
+# program's activity.
+competencia_programas:
+  # example-program: 0.5

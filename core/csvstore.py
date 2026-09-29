@@ -33,6 +33,8 @@ from typing import Dict, Iterable, List, Optional
 SCHEMA: Dict[str, List[str]] = {
     "programs": [
         "handle", "name", "state", "bounty", "last_synced_at",
+        # ── analyst layer (additive; migrated as "" on old files) ──
+        "enabled", "policy_md",
     ],
     "scopes": [
         "program", "asset", "asset_type", "in_scope", "severity_max",
@@ -46,6 +48,8 @@ SCHEMA: Dict[str, List[str]] = {
         "id", "program", "title", "severity", "cvss_vector", "cvss_score",
         "cwe", "asset", "status", "dedup_hash", "report_path",
         "created_at", "updated_at",
+        # ── analyst layer: explicit vuln class powers reportability ──
+        "vuln_class",
     ],
     "reports": [
         "id", "finding_id", "version", "path", "submitted_at",
@@ -58,6 +62,23 @@ SCHEMA: Dict[str, List[str]] = {
     "events": [
         "ts", "session_id", "agent", "level", "message", "payload_json",
     ],
+    # ──────────────────────────────────────────────────────────────────
+    #  Analyst / decision layer (added by the senior-analyst extension).
+    # ──────────────────────────────────────────────────────────────────
+    "policies": [
+        "program", "parsed_at", "allowed_testing", "prohibited_actions",
+        "excluded_vuln_classes", "severity_floor", "bounty_eligibility_rules",
+        "report_requirements", "rate_limits_declarados", "window_de_testing",
+        "red_flags", "needs_manual_review", "source_json_path",
+    ],
+    "plans": [
+        "id", "program", "asset", "session_id", "created_at", "priority",
+        "checks_count", "plan_path",
+    ],
+    "reportability": [
+        "finding_id", "evaluated_at", "verdict", "reason", "priority",
+        "policy_quote", "next_agent",
+    ],
 }
 
 # Composite keys used by upsert() when the caller does not pass one.
@@ -69,6 +90,10 @@ DEFAULT_KEYS: Dict[str, List[str]] = {
     "reports": ["id"],
     "sessions": ["id"],
     "events": [],  # append-only, never upserted
+    # Analyst layer.
+    "policies": ["program"],
+    "plans": ["id"],
+    "reportability": ["finding_id"],
 }
 
 # Default data directory. Overridable via CSVStore(data_dir=...).
@@ -80,6 +105,49 @@ DEFAULT_DATA_DIR = Path(
 def utc_now() -> str:
     """Return the current time as an ISO-8601 UTC string (seconds precision)."""
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+
+
+def parse_iso(value: str) -> Optional[datetime]:
+    """
+    Parse an ISO-8601 timestamp produced by :func:`utc_now` (or a plain date)
+    into a timezone-aware ``datetime`` in UTC. Returns ``None`` on any failure
+    or empty input, so callers can treat "unparseable" as "unknown".
+    """
+    if not value:
+        return None
+    raw = str(value).strip()
+    if not raw:
+        return None
+    # Tolerate a trailing "Z" (some producers use it instead of +00:00).
+    if raw.endswith("Z"):
+        raw = raw[:-1] + "+00:00"
+    try:
+        dt = datetime.fromisoformat(raw)
+    except ValueError:
+        # Last resort: a bare date (YYYY-MM-DD).
+        try:
+            dt = datetime.strptime(raw[:10], "%Y-%m-%d")
+        except ValueError:
+            return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
+
+
+def days_since(value: str, now: Optional[datetime] = None) -> Optional[float]:
+    """
+    Whole/fractional days between an ISO timestamp and *now* (UTC).
+
+    Returns ``None`` when the input cannot be parsed, so "never happened" and
+    "cannot tell" are distinguishable from a real ``0``.
+    """
+    dt = parse_iso(value)
+    if dt is None:
+        return None
+    ref = now or datetime.now(timezone.utc)
+    if ref.tzinfo is None:
+        ref = ref.replace(tzinfo=timezone.utc)
+    return (ref - dt).total_seconds() / 86400.0
 
 
 class CSVStore:

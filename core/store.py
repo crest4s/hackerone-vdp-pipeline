@@ -70,19 +70,29 @@ class Store:
 
     # ── programs ─────────────────────────────────────────────────────────
     def upsert_program(
-        self, handle: str, name: str = "", state: str = "", bounty: str = ""
+        self,
+        handle: str,
+        name: str = "",
+        state: str = "",
+        bounty: str = "",
+        *,
+        enabled: Optional[bool] = None,
+        policy_md: str = "",
     ) -> Dict[str, str]:
-        return self.csv.upsert(
-            "programs",
-            {
-                "handle": handle,
-                "name": name,
-                "state": state,
-                "bounty": bounty,
-                "last_synced_at": utc_now(),
-            },
-            key=["handle"],
-        )
+        row: Dict[str, Any] = {
+            "handle": handle,
+            "name": name,
+            "state": state,
+            "bounty": bounty,
+            "last_synced_at": utc_now(),
+        }
+        # Only overwrite the analyst-layer columns when the caller supplies
+        # them, so a plain re-sync never clobbers a policy captured earlier.
+        if enabled is not None:
+            row["enabled"] = bool(enabled)
+        if policy_md:
+            row["policy_md"] = policy_md
+        return self.csv.upsert("programs", row, key=["handle"])
 
     def get_program(self, handle: str) -> Optional[Dict[str, str]]:
         for row in self.csv.read_all("programs"):
@@ -161,6 +171,10 @@ class Store:
             "report_path": report_path,
             "created_at": now,
             "updated_at": now,
+            # Persist the vuln class explicitly so reportability can match it
+            # against a program's excluded_vuln_classes without re-parsing the
+            # title. The dedup hash is unchanged, so dedup behaviour is intact.
+            "vuln_class": vuln_class,
         }
         return self.csv.upsert("findings", row, key=["id"])
 
@@ -258,3 +272,89 @@ class Store:
                 "payload_json": json.dumps(payload or {}, ensure_ascii=False),
             },
         )
+
+    # ── policies (parsed program policy, key: program) ───────────────────
+    def upsert_policy(self, program: str, **fields: Any) -> Dict[str, str]:
+        """
+        Upsert the parsed policy for a program. List/dict fields are stored as
+        JSON strings so the CSV stays a single flat cell per column.
+        """
+        row: Dict[str, Any] = {"program": program, "parsed_at": utc_now()}
+        for key, value in fields.items():
+            row[key] = _jsonify(value)
+        return self.csv.upsert("policies", row, key=["program"])
+
+    def get_policy(self, program: str) -> Optional[Dict[str, str]]:
+        for row in self.csv.read_all("policies"):
+            if row.get("program") == program:
+                return row
+        return None
+
+    def list_policies(self) -> List[Dict[str, str]]:
+        return self.csv.read_all("policies")
+
+    # ── plans (attack plan per asset, key: id) ───────────────────────────
+    def create_plan(
+        self,
+        program: str,
+        asset: str,
+        *,
+        session_id: str = "",
+        priority: str = "",
+        checks_count: int = 0,
+        plan_path: str = "",
+    ) -> Dict[str, str]:
+        pid = str(self.csv.next_id("plans"))
+        row = {
+            "id": pid,
+            "program": program,
+            "asset": asset,
+            "session_id": session_id,
+            "created_at": utc_now(),
+            "priority": priority,
+            "checks_count": str(checks_count),
+            "plan_path": plan_path,
+        }
+        return self.csv.upsert("plans", row, key=["id"])
+
+    def list_plans(self, program: Optional[str] = None) -> List[Dict[str, str]]:
+        rows = self.csv.read_all("plans")
+        if program is not None:
+            rows = [r for r in rows if r.get("program") == program]
+        return rows
+
+    # ── reportability (verdict per finding, key: finding_id) ─────────────
+    def upsert_reportability(
+        self,
+        finding_id: str,
+        *,
+        verdict: str,
+        reason: str = "",
+        priority: str = "",
+        policy_quote: str = "",
+        next_agent: str = "",
+    ) -> Dict[str, str]:
+        row = {
+            "finding_id": str(finding_id),
+            "evaluated_at": utc_now(),
+            "verdict": verdict,
+            "reason": reason,
+            "priority": priority,
+            "policy_quote": policy_quote,
+            "next_agent": next_agent,
+        }
+        return self.csv.upsert("reportability", row, key=["finding_id"])
+
+    def list_reportability(self) -> List[Dict[str, str]]:
+        return self.csv.read_all("reportability")
+
+
+def _jsonify(value: Any) -> str:
+    """Serialise lists/dicts to compact JSON; pass scalars through as strings."""
+    if value is None:
+        return ""
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, (list, dict)):
+        return json.dumps(value, ensure_ascii=False)
+    return str(value)

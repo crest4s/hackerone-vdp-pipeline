@@ -46,13 +46,89 @@ queryable history in plain CSV.
                                                               └────────────────┘
 ```
 
-- **`core/`** — shared Python: API client, scope engine, CSV store, config, logger.
-- **`agents/`** — Markdown role definitions (one file per agent).
+- **`core/`** — shared Python: API client, scope engine, CSV store, config, logger,
+  plus the analyst engines (`scoring`, `policy`, `planner`, `reportability`, `severity`).
+- **`agents/`** — Markdown role definitions (one file per agent, 13 total).
 - **`scripts/`** — CLI entry points.
-- **`config/`** — technical config + the program registry.
+- **`config/`** — technical config, the program registry, `scoring.yaml`, and
+  `checklists/` (WSTG / API Top 10 / MASVS / cloud / network).
 - **`data/`** — CSV history (git-ignored).
-- **`workspace/`** — runtime evidence + logs (git-ignored).
+- **`workspace/`** — runtime evidence, logs and plans (git-ignored).
 - **`templates/`** — report template + finding schema.
+
+## The full analyst flow (12 phases)
+The pipeline no longer only *executes and reports* — it now models the **decisions**
+a senior analyst makes: which program to attack, how to read the policy, how to
+plan, and what is actually worth reporting.
+
+```
+  selección → política → sync → plan → recon → vuln → triage → reportability → reporte → cierre
+
+ ┌──────────────────────┐
+ │ -1 program_selector  │  rank programs by attractiveness today  → workspace/plans/…
+ ├──────────────────────┤
+ │  0 policy_parser      │  policy text → actionable structure     → …policy.json + policies.csv
+ ├──────────────────────┤
+ │  1 h1_agent           │  sync programs + structured scopes      → programs.csv / scopes.csv
+ ├──────────────────────┤
+ │  2 attack_planner     │  in-scope asset → prioritised plan       → plan_<asset>.md + plans.csv
+ ├──────────────────────┤   (scope_agent is the HARD GATE before phases 2–4)
+ │  3 recon_agent        │  discovery guided by the plan            → assets.csv
+ ├──────────────────────┤
+ │  4 vuln_agent         │  safe, non-destructive testing           → evidence + findings.csv
+ ├──────────────────────┤
+ │  5 triage_agent       │  technical validation (CVSS + CWE)       → findings.status=triaged
+ ├──────────────────────┤
+ │  6 reportability      │  final filter: is it worth a report?     → reportability.csv
+ ├──────────────────────┤
+ │  7 reporter_agent     │  HackerOne-format report (dry-run)       → report.md + finding.json
+ ├──────────────────────┤
+ │  8 orchestrator       │  close the session                       → sessions.ended_at
+ └──────────────────────┘
+```
+
+### The four decision agents (new)
+- **`program_selector_agent`** — ranks programs by 7 weighted, configurable
+  criteria (bounty, triage speed, scope size/variety, competition, skill fit,
+  freshness, personal saturation) and says *"start today with X"* and why.
+  Never ranks a `enabled: false` program.
+- **`policy_parser_agent`** — segments the policy into recognised sections and
+  extracts allowed testing, prohibited actions, excluded vuln classes, severity
+  floor, bounty rules, report requirements, rate limits, testing window and red
+  flags — each with a literal `source_quote`. Deny-by-default on ambiguity.
+- **`attack_planner_agent`** — turns an in-scope asset + parsed policy into an
+  ROI-ordered checklist (quick wins vs deep dives), dropping anything the policy
+  excludes or prohibits, and honouring "only manual" programs.
+- **`reportability_agent`** — the final filter before you spend time writing:
+  an ordered decision ladder that returns a verdict, a priority and the exact
+  policy quote it relied on. It only *suggests* the next agent, never invokes it.
+
+## Cómo se usa (secuencia real de comandos)
+```bash
+# -1) ¿A qué programa apunto hoy?
+python scripts/rank_programs.py --top 3           # → workspace/plans/programs_ranking_<fecha>.md
+
+#  1) Sincroniza programa + scopes (read-only)
+python scripts/h1_sync.py --program acme
+
+#  0) Parsea la política a algo accionable
+python scripts/parse_policy.py --program acme      # → workspace/scope/acme.policy.json + policies.csv
+
+#  gate) Valida el asset (exit 0 = in scope, 2 = out)
+python scripts/scope_validate.py --program acme --target app.acme.com
+
+#  2) Planifica el ataque sobre un asset in-scope
+python scripts/plan_attack.py --program acme --asset app.acme.com
+
+#  3–5) recon / vuln / triage → agentes manuales supervisados en Claude Code
+
+#  6) ¿Merece reporte?  (uno, o todos los abiertos de un programa)
+python scripts/reportability.py --finding 42
+python scripts/reportability.py --program acme --all-open
+
+# Ver todo el flujo con datos ficticios, sin tocar la red:
+python scripts/simulate_session.py                 # → workspace/plans/_simulation/
+```
 
 ## Requirements
 - Python 3.11+ (tested on 3.14).

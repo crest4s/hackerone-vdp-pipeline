@@ -15,6 +15,8 @@ data); only this README and `.gitkeep` are tracked.
 | state | str | Program state (e.g. `public_mode`, `soft_launched`). |
 | bounty | bool-ish | Whether the program offers bounties. |
 | last_synced_at | datetime | Last successful sync. |
+| enabled | bool | Mirrors `config/programs.yaml` `enabled` (analyst layer). |
+| policy_md | str | Free-text policy, parsed by `policy_parser_agent`. |
 
 ## `scopes.csv`  (key: program + asset)
 | column | type | meaning |
@@ -56,6 +58,7 @@ data); only this README and `.gitkeep` are tracked.
 | report_path | str | Path to the rendered report, if any. |
 | created_at | datetime | Creation time. |
 | updated_at | datetime | Last update. |
+| vuln_class | str | Vuln class (e.g. `IDOR`, `SSRF`); used by `reportability_agent`. |
 
 ## `reports.csv`  (key: id)
 | column | type | meaning |
@@ -90,3 +93,53 @@ data); only this README and `.gitkeep` are tracked.
 | level | str | `debug`/`info`/`warning`/`error`/`critical`. |
 | message | str | Human-readable message. |
 | payload_json | json | Structured payload. |
+
+---
+
+# Analyst / decision layer
+
+These three entities back the senior-analyst agents. List/dict fields are stored
+as JSON strings in a single cell.
+
+## `policies.csv`  (key: program)
+Written by `policy_parser_agent` (`core.policy`).
+| column | type | meaning |
+|--------|------|---------|
+| program | str | Program handle (primary key). |
+| parsed_at | datetime | When the policy was parsed. |
+| allowed_testing | json | `[{value, source_quote}]` — permitted testing types. |
+| prohibited_actions | json | `[{value, source_quote}]` — DoS, fuzzing, social eng… |
+| excluded_vuln_classes | json | `[{value, source_quote}]` — self-XSS, missing headers… |
+| severity_floor | str | Minimum accepted severity (`` if indeterminate). |
+| bounty_eligibility_rules | json | `[{value, source_quote}]` — bounty vs swag vs kudos. |
+| report_requirements | json | `[{value, source_quote}]` — PoC, video, language… |
+| rate_limits_declarados | json | `{value, source_quote}` — declared max rate, if any. |
+| window_de_testing | json | `{value, source_quote}` — testing window, if any. |
+| red_flags | json | `[{value, source_quote}]` — "only manual", "contact first"… |
+| needs_manual_review | bool | True if any governing section was missing/unclear. |
+| source_json_path | str | Path to the full `…policy.json`. |
+
+## `plans.csv`  (key: id)
+Written by `attack_planner_agent` (`core.planner`).
+| column | type | meaning |
+|--------|------|---------|
+| id | int | Auto-increment id. |
+| program | str | Program handle. |
+| asset | str | Planned asset. |
+| session_id | str | Owning session id. |
+| created_at | datetime | Plan creation time. |
+| priority | str | `high`/`medium`/`low` overall plan priority. |
+| checks_count | int | Number of checks in the plan (after filtering). |
+| plan_path | str | Path to the rendered `plan_<asset>.md`. |
+
+## `reportability.csv`  (key: finding_id)
+Written by `reportability_agent` (`core.reportability`).
+| column | type | meaning |
+|--------|------|---------|
+| finding_id | int | FK to `findings.id` (primary key). |
+| evaluated_at | datetime | When the verdict was computed. |
+| verdict | str | `report_now`, `reportable_no_bounty`, `not_reportable_*`, `already_reported`, `report_later_low_return`, `needs_manual_review`. |
+| reason | str | Human-readable justification. |
+| priority | str | `high`/`medium`/`low` (for reportable verdicts). |
+| policy_quote | str | Literal policy fragment the verdict relied on. |
+| next_agent | str | Suggested next agent (never auto-invoked). |

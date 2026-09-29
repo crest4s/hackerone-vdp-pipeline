@@ -24,6 +24,7 @@ workspace/recon/
 workspace/findings/
 workspace/reports/
 workspace/scope/
+workspace/plans/
 !workspace/**/.gitkeep
 
 # Legacy / scratch output dirs

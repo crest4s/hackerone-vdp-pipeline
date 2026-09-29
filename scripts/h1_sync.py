@@ -48,14 +48,21 @@ def _write_scope_snapshot(scope_dir: Path, handle: str, scopes) -> Path:
     return out
 
 
-def sync_program(handle: str, client, store: Store, scope_dir: Path, log: Logger) -> dict:
+def sync_program(handle: str, client, store: Store, scope_dir: Path, log: Logger,
+                 cfg=None) -> dict:
     program = client.get_program(handle)
     attrs = program.get("data", {}).get("attributes", program.get("attributes", {}))
+    # `enabled` (from config, the authoritative flag) and `policy` text are
+    # persisted so the analyst layer (program_selector / policy_parser) can work
+    # straight from data/*.csv without re-reading YAML.
+    enabled = cfg.is_enabled(handle) if cfg is not None else None
     store.upsert_program(
         handle=handle,
         name=attrs.get("name", ""),
         state=attrs.get("state", ""),
         bounty=str(attrs.get("offers_bounties", "")),
+        enabled=enabled,
+        policy_md=attrs.get("policy", "") or "",
     )
     scopes = client.get_structured_scopes(handle)
     _write_scope_snapshot(scope_dir, handle, scopes)
@@ -121,7 +128,7 @@ def main() -> int:
     total = 0
     for h in handles:
         try:
-            res = sync_program(h, client, store, scope_dir, log)
+            res = sync_program(h, client, store, scope_dir, log, cfg=cfg)
             print(f"OK  {h:30s} scopes={res['scopes']}")
             total += 1
         except Exception as exc:  # noqa: BLE001
