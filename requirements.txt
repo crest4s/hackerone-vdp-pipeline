@@ -1,0 +1,10 @@
+# HTTP client for the HackerOne REST API
+requests>=2.31,<3.0
+# YAML configuration parsing (config.yaml, programs.yaml)
+PyYAML>=6.0,<7.0
+# Jinja2 templating for HackerOne-format reports
+Jinja2>=3.1,<4.0
+# Rich CLI dashboard / tables
+rich>=13.7,<14.0
+# .env loading (keeps tokens out of the shell history and out of git)
+python-dotenv>=1.0,<2.0

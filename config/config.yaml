@@ -1,0 +1,79 @@
+# ═══════════════════════════════════════════════════════════════
+#  Technical configuration for the DevSecOps bug-bounty pipeline.
+#  Values here are intentionally CONSERVATIVE. They must stay at or
+#  below the real limits published by each program / HackerOne.
+# ═══════════════════════════════════════════════════════════════
+
+h1:
+  # Base URL of the official HackerOne REST API (v1).
+  base_url: "https://api.hackerone.com/v1/"
+  # Client-side rate limit. HackerOne allows more, but we stay well
+  # under it to be a polite API citizen. Requests per second.
+  rate_limit_rps: 2
+  # Max retries for transient errors (429 / 5xx) before giving up.
+  max_retries: 5
+  # Base backoff (seconds); actual wait = base * 2**attempt (+jitter).
+  backoff_base_seconds: 1.0
+  # DRY-RUN by default: report *submission* to H1 is never performed
+  # automatically. Flip to false ONLY with explicit human intent.
+  dry_run_submit: true
+  # Identifiable, honest user-agent. Do not spoof browsers.
+  user_agent: "vdp-pipeline/1.0 (+authorized-research; contact-in-h1-profile)"
+
+recon:
+  # Concurrency for lightweight recon tooling.
+  threads: 10
+  httpx_threads: 25
+  # nmap timing template. T2 = "polite": slow, low-footprint.
+  nmap_timing: "T2"
+  # Global packet rate ceiling for port scanning (packets/sec).
+  max_rate: 100
+  # Tool tags we NEVER run during recon. Passed through to any
+  # tag-aware tool as an exclusion set.
+  excluded_tags:
+    - intrusive
+    - fuzz
+    - dos
+    - brute-force
+
+nuclei:
+  # Severities we are willing to surface. We keep 'info' out of the
+  # default run to reduce noise; raise/lower per engagement.
+  allowed_severities:
+    - low
+    - medium
+    - high
+    - critical
+  # Dangerous template tags that are ALWAYS excluded.
+  excluded_tags:
+    - intrusive
+    - fuzz
+    - dos
+    - brute-force
+    - default-login
+  # Requests per second cap for nuclei.
+  rate_limit: 50
+  # Templates processed in parallel.
+  bulk_size: 25
+  # Concurrent template execution.
+  concurrency: 10
+
+paths:
+  workspace: "workspace"
+  data: "data"
+  logs: "workspace/logs"
+  scope: "workspace/scope"
+  recon: "workspace/recon"
+  findings: "workspace/findings"
+  reports: "workspace/reports"
+
+safety:
+  # Every active action must be preceded by a scope check.
+  require_scope_validation: true
+  # If ANY target resolves out-of-scope, abort the whole action.
+  abort_on_out_of_scope: true
+  # Hard ceiling on requests per host per minute across all tooling.
+  max_requests_per_host_per_min: 60
+  # Refuse to run active tooling unless docs/AUTHORIZATION.md has an
+  # entry for the program (enforced by scripts, advisory here).
+  require_authorization_record: true

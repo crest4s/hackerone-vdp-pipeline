@@ -1,0 +1,46 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "HackerOne-ready finding",
+  "type": "object",
+  "required": ["program", "title", "severity_rating", "vulnerability_information"],
+  "properties": {
+    "program":        { "type": "string", "description": "H1 program handle (team_handle)." },
+    "title":          { "type": "string", "maxLength": 250 },
+    "severity_rating":{ "type": "string", "enum": ["none", "low", "medium", "high", "critical"] },
+    "cvss": {
+      "type": "object",
+      "properties": {
+        "score":  { "type": "number", "minimum": 0.0, "maximum": 10.0 },
+        "vector": { "type": "string", "description": "CVSS 3.1 vector string." }
+      }
+    },
+    "weakness": {
+      "type": "object",
+      "properties": {
+        "cwe_id": { "type": "string", "description": "e.g. CWE-79" },
+        "owasp":  { "type": "string", "description": "e.g. A03:2021-Injection" }
+      }
+    },
+    "asset":   { "type": "string" },
+    "endpoint":{ "type": "string" },
+    "vulnerability_information": {
+      "type": "string",
+      "description": "Full Markdown report body (the 7 sections)."
+    },
+    "impact":  { "type": "string" },
+    "references": { "type": "array", "items": { "type": "string" } },
+    "evidence_paths": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Relative paths under workspace/findings/ with raw evidence."
+    },
+    "dedup_hash": { "type": "string", "description": "sha256(program|asset|vuln_class|endpoint)." },
+    "submission": {
+      "type": "object",
+      "properties": {
+        "dry_run": { "type": "boolean", "default": true },
+        "confirmed_by_human": { "type": "boolean", "default": false }
+      }
+    }
+  }
+}

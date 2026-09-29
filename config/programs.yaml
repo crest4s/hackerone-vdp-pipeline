@@ -1,0 +1,28 @@
+# ═══════════════════════════════════════════════════════════════
+#  Program registry.
+#
+#  This file lists the HackerOne programs this pipeline is allowed
+#  to touch. A program is only ever acted upon when:
+#     1. `enabled: true` here, AND
+#     2. a matching authorization record exists in
+#        docs/AUTHORIZATION.md.
+#
+#  The example below is DISABLED. Never enable a program you are
+#  not explicitly, in-writing authorized to test.
+# ═══════════════════════════════════════════════════════════════
+
+programs:
+  - handle: "example-program"          # HackerOne program handle
+    name: "Example Program (template)"
+    enabled: false                     # <-- must be true to act
+    # Optional per-program overrides of config.yaml values.
+    overrides:
+      recon:
+        max_rate: 100
+      nuclei:
+        rate_limit: 50
+    # Free-text note: link to the ToS / private-invite / authorization.
+    authorization_ref: "docs/AUTHORIZATION.md#example-program"
+    notes: >
+      Template entry. Duplicate this block per real program,
+      set enabled: true only after recording authorization.

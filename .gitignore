@@ -1,0 +1,62 @@
+# ─────────────────────────────────────────────────────────────
+#  Secrets & credentials  — NEVER commit
+# ─────────────────────────────────────────────────────────────
+.env
+.env.*
+!.env.example
+secrets/
+*.pem
+*.key
+*.p12
+*.pfx
+
+# ─────────────────────────────────────────────────────────────
+#  Persistent history (CSV) — local-only, may contain program data
+# ─────────────────────────────────────────────────────────────
+data/*.csv
+!data/.gitkeep
+
+# ─────────────────────────────────────────────────────────────
+#  Runtime evidence & artefacts (out of git by design)
+# ─────────────────────────────────────────────────────────────
+workspace/logs/
+workspace/recon/
+workspace/findings/
+workspace/reports/
+workspace/scope/
+!workspace/**/.gitkeep
+
+# Legacy / scratch output dirs
+references/
+results/
+reports/
+
+# ─────────────────────────────────────────────────────────────
+#  Python
+# ─────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+*.egg-info/
+.eggs/
+build/
+dist/
+.ruff_cache/
+.mypy_cache/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# ─────────────────────────────────────────────────────────────
+#  OS / editor
+# ─────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+*~

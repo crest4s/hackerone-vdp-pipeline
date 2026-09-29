@@ -1,0 +1,46 @@
+# {{ finding.title }}
+
+> Programa: **{{ finding.program }}**  ·  Activo: **{{ finding.asset }}**
+> Finding ID: `{{ finding.id }}`  ·  Estado: `{{ finding.status }}`
+> Generado: {{ generated_at }}
+
+---
+
+## 1. Título
+{{ finding.title }}
+
+## 2. Severidad
+- **CVSS 3.1 Score:** {{ finding.cvss_score or "N/A" }}
+- **Vector:** `{{ finding.cvss_vector or "N/A" }}`
+- **Cualitativa:** {{ severity_label }}
+
+## 3. Descripción
+{{ description }}
+
+## 4. Pasos para reproducir
+{% for step in steps %}{{ loop.index }}. {{ step }}
+{% endfor %}
+{% if poc_evidence %}
+**Evidencia (PoC):**
+```
+{{ poc_evidence }}
+```
+{% endif %}
+
+## 5. Impacto
+**Impacto técnico:**
+{{ impact_technical }}
+
+**Impacto de negocio:**
+{{ impact_business }}
+
+## 6. Remediación
+{{ remediation }}
+
+## 7. Referencias
+{% for ref in references %}- {{ ref }}
+{% endfor %}
+{% if finding.cwe %}- CWE: {{ finding.cwe }}{% endif %}
+
+---
+*Reporte generado en modo dry-run. No se envía a HackerOne sin confirmación humana explícita.*
