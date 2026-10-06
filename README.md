@@ -138,6 +138,8 @@ python scripts/simulate_session.py                 # → workspace/plans/_simula
 
 ## Installation
 ```bash
+git clone https://github.com/crest4s/hackerone-vdp-pipeline.git
+cd hackerone-vdp-pipeline
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
@@ -194,3 +196,7 @@ This tooling is built to keep you inside authorization: scope is a hard gate,
 dangerous tooling is excluded by default, everything is logged, and submission is
 human-confirmed. Do not remove these guardrails. See `docs/RUNBOOK.md` and
 `docs/AUTHORIZATION.md`.
+
+## License
+
+[MIT](LICENSE)
